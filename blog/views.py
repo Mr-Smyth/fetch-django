@@ -65,26 +65,50 @@ class PostDisplay(PageContextMixin, SingleObjectMixin, View):
 class PostComment(FormView):
     form_class = CommentForm
 
-    def form_invalid(self, form):
+    # --------------------------------------------
+    #
+    # Ajax - step 3 - add form invalid method
 
-        # For ajax step 2 -----------------------
-        # check is request an ajax request
+    def form_invalid(self, form):
+        # check if header in request includes ajax (XML - see js)
         if self.request.is_ajax():
+            # if it is an ajax request return the errors from the form
             return JsonResponse({"error": form.errors}, status=400)
         else:
-            return JsonResponse({"error": "Invalid form and request"}, status=400)
+            return JsonResponse({"error": "Invalid form and request"},
+                                status=400)
 
+    # --------------------------------------------
+
+    # --------------------------------------------
+    #
+    # Ajax - step 2
+    #
+    # check is request an ajax request
     def form_valid(self, form):
         if self.request.is_ajax():
             form.instance.by = self.request.user
             post = Post.objects.get(pk=self.kwargs['pk'])
             form.instance.post = post
+            # put form.save() into the variable comment_instance
             comment_instance = form.save()
+            # serialize the new comment into json format. 2 args
+            # first arg is the format - (json)
+            # second arg is the save form and part of query set
             ser_comment = serializers.serialize("json", [comment_instance, ])
+
+            # then return the serialized response of the serialized comment
+            # and a status 200
             return JsonResponse({"new_comment": ser_comment}, status=200)
         else:
-            return JsonResponse({"error": "Error occured during request"}, status=400)
+            # else return a nice big error and status 400 if it is not an
+            # ajax request
+            return JsonResponse({"error": "Error occured during request"},
+                                status=400)
 
+        # --------------------------------------------
+
+        # No need for a get_success_url
 
 class PostDetail(View):
     def get(self, request, *args, **kwargs):

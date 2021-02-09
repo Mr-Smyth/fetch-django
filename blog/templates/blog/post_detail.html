@@ -1,0 +1,159 @@
+{% extends 'blog/base.html' %}
+
+{% load static %}
+
+{% block title %}
+    {{ page_title }} - {{ block.super }}
+{% endblock title %}
+
+{% block breadcrumb %}{{ block.super }} > 12 Gift ideas for Christmas{% endblock %}
+
+{% block content %}
+
+    <div class="blog-item">
+        <h2>{{ post.title }}</h2>
+        <div class="info">
+            By <span><a href="#">{{ post.author }}</a></span> | In <span><a href="#">{{ post.category }}</a></span> | On <span>{{ post.pub_date }}</span> | &#x1f441 <span>{{ post.view_count }} Views</span> 
+        </div>
+        <p>     {{ post.content }}      </p>
+    </div>
+
+    <div class="form">
+        <form id="comment-form" action="" method="post" novalidate>
+            {% csrf_token %}
+            {{ form.as_p }}
+            <p><input type="submit" value="Submit"></p> 
+        </form>
+    </div>
+
+
+    <div class="comments-list">
+        {% for cmt in comments %}
+            <div class="comment">
+                <img src="{% static 'blog/images/avatar.png' %}" alt="avatar">
+                <div class="info">
+                    <p>{{ cmt.by }}<span> . {{ cmt.created_on }}</span></p>
+                    <p>{{ cmt.content }}</p>
+                </div>   
+            </div>
+        {% empty %}
+            <div class="no-comment">
+                <h3>There are no comments yet.</h3>
+            </div>
+        {% endfor %}
+        
+    </div>
+
+{% endblock %}
+
+{% block javascript %}
+
+<!-- Ajax step 3 - create the js -->
+<script>
+
+    /* 3 . build the create comment method */
+  function createComment(formData) {
+      /**
+       * Here is where we create the comment
+       * This is where we actually communicate with the server.
+       */
+
+            // because django wont be submitting the form now, we need to make js submit the csrf token
+            // so get it in the form
+    console.log("Posting Comment");
+
+            // i use getElementsByName and return the value of the first index of the result 
+    let csrfValue = document.getElementsByName("csrfmiddlewaretoken")[0].value;
+
+            /* Use the fetch method to communicate with the server
+                We are using the url of the post_detail template 
+                We are also passing the primary key of the post as its argument */
+    fetch("{% url 'post_detail' post.pk %}", {
+            // must specify method as default is GET - here we want to POST to the server.
+        method: "Post",
+
+            // we want to include some additional info, so use headers
+        headers: {
+            // this is the csrf token we grabbed above
+        "X-CSRFToken": csrfValue,
+            // this makes it an ajax request, which is what we check for in our django view.
+            // important - this is required for it to work even though we use fetch
+        "X-Requested-With": "XMLHttpRequest"
+
+            // if we were using django rest framework we would be using content_type application json
+        },
+            // the body will be the form data we get from the comment form
+      body: formData
+
+      // if fetch is successful convert the plain text data back to json
+    }).then(function(response) {
+      return response.json();
+
+      // then just reset the form and update
+    }).then(function(data) {
+      commentForm.reset();
+      console.log(data);
+      // get the instance of the new comment
+      // the JSON.parse method converts the data into a JS object so we are now able to manipulate it.
+      let instance = JSON.parse(data["new_comment"]);
+      // we use 0 here because the queryset in our django view has comment_instance set at index 0 in the queryset
+      let fields = instance[0]["fields"];
+      // now get the 2 elements we are interested in updating. The comment-list - so we can update it
+      // and also the no comment div, so we can remove it if there is a comment being added.
+      let commentsList = document.querySelector(".comments-list");
+      let noCommentFlag= document.querySelector(".no-comment");
+
+      // check if there is a no-comment element - remove it - as we dont need it anymore
+      if(noCommentFlag) {
+        commentsList.removeChild(noCommentFlag);
+      }
+      // then append the comment in the comments list using template literal
+      commentsList.innerHTML += `
+        <div class="comment">
+            <img src="{% static 'blog/images/avatar.png' %}" alt="avatar">
+            <div class="info">
+                <p>{{ user }}<span> . Just Now</span></p>
+                <p>${fields['content'] || " "}</p>
+            </div>   
+        </div>
+      `;
+    // if fetch is not successful - then catch the error
+    }).catch((error) => {
+        // just console out the error
+      console.error("Error", error);
+    })
+  }   
+
+  /** 2. handles the submitting of the comment */
+  function submitComment(e) {
+      /** 
+       * called whenever the form is submitted 
+      */
+
+     // first prevent the default from happening
+    e.preventDefault();
+
+    // grab the content
+    let content = document.querySelector("#id_content").value;
+
+    // if there is content
+    if(content){
+      //Yay - there is content
+      // use the FormData browser API to grab the form data - 
+      // prob not needed here as we only have one field
+      let formData = new FormData(commentForm);
+
+      // Call the createComment method that we will create next
+      createComment(formData);
+    }else {
+        // form is empty! you dont need to submit
+      console.log("You cannot submit an empty form")
+    }
+  }
+
+  /* 1 - get the form element "comment-form"  
+  - then just listen for a submit and call the function to handle the fetch*/
+  let commentForm = document.getElementById("comment-form");
+  commentForm.addEventListener("submit", submitComment);
+</script>
+{% endblock javascript %}
